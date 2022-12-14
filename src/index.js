@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const { readFile } = require('./readFile');
+const token = require('./utils/generateToken');
 
 const app = express();
 app.use(express.json());
@@ -28,6 +29,11 @@ app.get('/talker/:id', async (req, res) => {
       return res.status(404).json({ message: 'Pessoa palestrante não encontrada' });
     }
     res.status(HTTP_OK_STATUS).json(filteredTalker);
+});
+
+app.post('/login', async (_req, res) => {
+    const newToken = token();
+    res.status(HTTP_OK_STATUS).json({ token: newToken });
 });
 
 app.listen(PORT, () => {
