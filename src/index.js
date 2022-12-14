@@ -2,6 +2,8 @@ const express = require('express');
 const path = require('path');
 const { readFile } = require('./readFile');
 const token = require('./utils/generateToken');
+const { validationEmail } = require('./validations/validationEmail');
+const { validationPassword } = require('./validations/validationPassword');
 
 const app = express();
 app.use(express.json());
@@ -31,7 +33,7 @@ app.get('/talker/:id', async (req, res) => {
     res.status(HTTP_OK_STATUS).json(filteredTalker);
 });
 
-app.post('/login', async (_req, res) => {
+app.post('/login', validationEmail, validationPassword, (_req, res) => {
     const newToken = token();
     res.status(HTTP_OK_STATUS).json({ token: newToken });
 });
