@@ -68,6 +68,30 @@ app.post('/talker',
   }
 });
 
+app.put('/talker/:id',
+  authentication,
+  validationName,
+  validationAge,
+  validationTalk,
+  validationWatchedAt,
+  validationRate, async (req, res) => {
+ try {
+   const { id } = req.params;
+   const { name, age, talk: { watchedAt, rate } } = req.body;
+   const talkers = await readFile(pathName);
+  const editTalker = talkers.find((talker) => talker.id === Number(id));
+  editTalker.id = Number(id);
+  editTalker.name = name;
+  editTalker.age = age;
+  editTalker.talk.watchedAt = watchedAt;
+  editTalker.talk.rate = rate;
+  await writeFile(pathName, talkers);
+  res.status(HTTP_OK_STATUS).json(editTalker);
+ } catch (error) {
+  console.error(error);
+ }
+});
+
 app.listen(PORT, () => {
   console.log('Online');
 });
