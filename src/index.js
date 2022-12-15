@@ -1,5 +1,6 @@
 const express = require('express');
 const path = require('path');
+const { write } = require('fs');
 const { authentication } = require('./middlewares/auth');
 const { readFile } = require('./readFile');
 const { writeFile } = require('./utils/writeFile');
@@ -90,6 +91,19 @@ app.put('/talker/:id',
  } catch (error) {
   console.error(error);
  }
+});
+
+app.delete('/talker/:id', authentication, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const talkers = await readFile(pathName);
+    const talkerIndex = talkers.findIndex((talker) => talker.id === Number(id));
+    talkers.splice(talkerIndex, 1);
+    await writeFile(pathName, talkers);
+    res.status(204).json();
+  } catch (error) {
+     console.error(error);
+  }
 });
 
 app.listen(PORT, () => {
