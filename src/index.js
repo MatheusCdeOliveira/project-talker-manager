@@ -1,6 +1,5 @@
 const express = require('express');
 const path = require('path');
-const { write } = require('fs');
 const { authentication } = require('./middlewares/auth');
 const { readFile } = require('./readFile');
 const { writeFile } = require('./utils/writeFile');
