@@ -1,9 +1,16 @@
 const express = require('express');
 const path = require('path');
+const { authentication } = require('./middlewares/auth');
 const { readFile } = require('./readFile');
+const { writeFile } = require('./utils/writeFile');
 const token = require('./utils/generateToken');
+const { validationAge } = require('./validations/validationAge');
 const { validationEmail } = require('./validations/validationEmail');
+const { validationName } = require('./validations/validationName');
 const { validationPassword } = require('./validations/validationPassword');
+const { validationRate } = require('./validations/validationRate');
+const { validationTalk } = require('./validations/validationTalk');
+const { validationWatchedAt } = require('./validations/validationWatchedAt');
 
 const app = express();
 app.use(express.json());
@@ -36,6 +43,29 @@ app.get('/talker/:id', async (req, res) => {
 app.post('/login', validationEmail, validationPassword, (_req, res) => {
     const newToken = token();
     res.status(HTTP_OK_STATUS).json({ token: newToken });
+});
+
+app.post('/talker',
+ authentication,
+  validationName,
+  validationAge,
+  validationTalk,
+  validationWatchedAt,
+  validationRate,
+   async (req, res) => {
+    try {
+    const { name, age, talk: { watchedAt, rate } } = req.body;
+    const talkers = await readFile(pathName);
+    const updatingID = talkers[talkers.length - 1].id + 1;
+    const newTalker = {
+      id: updatingID, name, age, talk: { watchedAt, rate },
+    };
+    const updatedTalkers = [...talkers, newTalker];
+    await writeFile(pathName, updatedTalkers);
+    res.status(201).json(newTalker);
+  } catch (__error) {
+    console.error(__error);
+  }
 });
 
 app.listen(PORT, () => {
