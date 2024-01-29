@@ -1,15 +1,14 @@
-const authentication = (req, res, next) => {
+const CustomError = require('./customError');
+
+const auth = (req, _res, next) => {
   const { authorization } = req.headers;
 
-  if (!authorization) {
-    res.status(401).json({ message: 'Token não encontrado' });
+  if (!authorization) throw new CustomError('Token não encontrado', 401);
+  if (authorization.length < 16 || typeof authorization !== 'string') {
+    throw new CustomError('Token inválido', 401);
   }
-  if (authorization.length !== 16 || typeof authorization !== 'string') {
-    res.status(401).json({ message: 'Token inválido' });
-  }
+
   next();
 };
 
-module.exports = {
-  authentication,
-};
+module.exports = auth;

@@ -1,16 +1,12 @@
 const express = require('express');
 const path = require('path');
-const { authentication } = require('./middlewares/auth');
-const { readFile } = require('./readFile');
+const CustomError = require('./middlewares/customError');
+const { readFile } = require('./utils/readFile');
+const generateToken = require('./utils/generateToken');
+const { validateLogin } = require('./validations/validateLogin');
 const { writeFile } = require('./utils/writeFile');
-const token = require('./utils/generateToken');
-const { validationAge } = require('./validations/validationAge');
-const { validationEmail } = require('./validations/validationEmail');
-const { validationName } = require('./validations/validationName');
-const { validationPassword } = require('./validations/validationPassword');
-const { validationRate } = require('./validations/validationRate');
-const { validationTalk } = require('./validations/validationTalk');
-const { validationWatchedAt } = require('./validations/validationWatchedAt');
+const auth = require('./middlewares/auth');
+const { validateTalker, validateTalkInfo } = require('./validations/validateNewTalker');
 
 const app = express();
 app.use(express.json());
@@ -24,103 +20,84 @@ const pathName = path.resolve(__dirname, './talker.json');
 app.get('/', (_request, response) => {
   response.status(HTTP_OK_STATUS).send();
 });
- 
-app.get('/talker', async (_req, res) => {
-   const talker = await readFile(pathName);
-   res.status(HTTP_OK_STATUS).json(talker);
-});
 
-app.get('/talker/search', authentication, async (req, res) => {
+app.get('/talker', async (_req, res, next) => {
   try {
-    const { q } = req.query;
     const talkers = await readFile(pathName);
-    const filteredTalker = talkers.filter((talker) => talker.name.includes(q));
-    if (!q) {
-     return res.status(HTTP_OK_STATUS).json(talkers);
-    }
-    if (!filteredTalker) {
-     return res.status(HTTP_OK_STATUS).json([]);
-    }
-    res.status(HTTP_OK_STATUS).json(filteredTalker);
+    return res.status(HTTP_OK_STATUS).json(talkers);
   } catch (error) {
-   console.error(error);
+    next(error);
   }
- });
+});
 
-app.get('/talker/:id', async (req, res) => {
+app.get('/talker/:id', async (req, res, next) => {
+  try {
     const { id } = req.params;
-    const talker = await readFile(pathName);
-    const filteredTalker = talker.find((element) => element.id === Number(id));
-    if (!filteredTalker) {
-      return res.status(404).json({ message: 'Pessoa palestrante não encontrada' });
-    }
-    res.status(HTTP_OK_STATUS).json(filteredTalker);
+    const talkers = await readFile(pathName);
+    const talkerId = talkers.find((e) => e.id === +id);
+    if (!talkerId) throw new CustomError('Pessoa palestrante não encontrada', 404);
+    return res.status(HTTP_OK_STATUS).json(talkerId);
+  } catch (error) {
+    next(error);
+  }
 });
 
-app.post('/login', validationEmail, validationPassword, (_req, res) => {
-    const newToken = token();
-    res.status(HTTP_OK_STATUS).json({ token: newToken });
+app.post('/login', validateLogin, (_req, res, next) => {
+  try {
+    const token = generateToken();
+    return res.status(HTTP_OK_STATUS).json({ token }); 
+  } catch (error) {
+    next();
+  }
 });
 
-app.post('/talker',
- authentication,
-  validationName,
-  validationAge,
-  validationTalk,
-  validationWatchedAt,
-  validationRate,
-   async (req, res) => {
-    try {
+app.post('/talker', auth, validateTalker, validateTalkInfo, async (req, res, next) => {
+  try {
     const { name, age, talk: { watchedAt, rate } } = req.body;
     const talkers = await readFile(pathName);
-    const updatingID = talkers[talkers.length - 1].id + 1;
     const newTalker = {
-      id: updatingID, name, age, talk: { watchedAt, rate },
+      name,
+      age,
+      id: talkers[talkers.length - 1].id + 1,
+      talk: { watchedAt, rate },
     };
-    const updatedTalkers = [...talkers, newTalker];
-    await writeFile(pathName, updatedTalkers);
-    res.status(201).json(newTalker);
-  } catch (__error) {
-    console.error(__error);
+    await writeFile(pathName, [...talkers, newTalker]);
+    return res.status(201).json(newTalker);
+  } catch (error) {
+    next(error);
   }
 });
 
-app.put('/talker/:id',
-  authentication,
-  validationName,
-  validationAge,
-  validationTalk,
-  validationWatchedAt,
-  validationRate, async (req, res) => {
- try {
-   const { id } = req.params;
-   const { name, age, talk: { watchedAt, rate } } = req.body;
-   const talkers = await readFile(pathName);
-  const editTalker = talkers.find((talker) => talker.id === Number(id));
-  editTalker.id = Number(id);
-  editTalker.name = name;
-  editTalker.age = age;
-  editTalker.talk.watchedAt = watchedAt;
-  editTalker.talk.rate = rate;
-  await writeFile(pathName, talkers);
-  res.status(HTTP_OK_STATUS).json(editTalker);
- } catch (error) {
-  console.error(error);
- }
+app.put('/talker/:id', auth, validateTalker, validateTalkInfo, async (req, res, next) => {
+  try {
+    const { name, age, talk: { watchedAt, rate } } = req.body;
+    const { id } = req.params;
+    const talkers = await readFile(pathName);
+    const talkerIndex = talkers.findIndex((talker) => talker.id === Number(id));
+    if (talkerIndex === -1) throw new CustomError('Pessoa palestrante não encontrada', 404);
+    talkers[talkerIndex] = { name, age, id: Number(id), talk: { watchedAt, rate } };
+    await writeFile(pathName, talkers);
+    return res.status(HTTP_OK_STATUS).json(talkers[talkerIndex]);
+  } catch (error) {
+    next(error);
+  }
 });
 
-app.delete('/talker/:id', authentication, async (req, res) => {
+app.delete('/talker/:id', auth, async (req, res, next) => {
   try {
     const { id } = req.params;
     const talkers = await readFile(pathName);
     const talkerIndex = talkers.findIndex((talker) => talker.id === Number(id));
     talkers.splice(talkerIndex, 1);
     await writeFile(pathName, talkers);
-    res.status(204).json();
+    return res.status(204).json();
   } catch (error) {
-     console.error(error);
+    next(error);
   }
 });
+
+app.use((error, _req, res, _next) => res.status(error.statusCode || 500)
+.json({ message: error.message }));
 
 app.listen(PORT, () => {
   console.log('Online');
